@@ -1,0 +1,249 @@
+<!doctype html>
+<!-- Copyright (C) 2026 JeepNWilly. Convertr_svc is free software under the GNU GPL v3 or later; no warranty. -->
+<html lang="en" data-theme="system">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Convertr</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/img/apple-touch-icon.png">
+<meta name="theme-color" content="#166270">
+<link rel="stylesheet" href="/css/app.css">
+<script type="module" src="/js/app.js"></script>
+</head>
+<body>
+<noscript><p class="notice">Convertr needs JavaScript.</p></noscript>
+
+<!-- login / first-run setup -->
+<main id="auth" class="auth" hidden>
+  <form id="login-form" class="card" autocomplete="on" hidden>
+    <img class="logo-lg" src="/img/logo-128.png" width="64" height="64" alt="">
+    <h1>Convertr</h1>
+    <p class="muted">Sign in to continue.</p>
+    <label>Password <input id="login-password" type="password" autocomplete="current-password" required></label>
+    <p id="login-error" class="error" role="alert"></p>
+    <button type="submit" class="primary">Sign in</button>
+  </form>
+  <form id="setup-form" class="card" autocomplete="off" hidden>
+    <img class="logo-lg" src="/img/logo-128.png" width="64" height="64" alt="">
+    <h1>Welcome to Convertr</h1>
+    <p class="muted">First-run setup. The one-time setup token is printed in the service log:<br><code>journalctl -u convertr-svc | grep "SETUP"</code></p>
+    <label>Setup token <input id="setup-token" type="text" autocomplete="off" spellcheck="false" required></label>
+    <label>New password <input id="setup-password" type="password" autocomplete="new-password" minlength="10" required></label>
+    <label>Repeat password <input id="setup-password2" type="password" autocomplete="new-password" minlength="10" required></label>
+    <p class="muted small">At least 10 characters.</p>
+    <p id="setup-error" class="error" role="alert"></p>
+    <button type="submit" class="primary">Set password</button>
+  </form>
+</main>
+
+<!-- the application -->
+<div id="app" hidden>
+  <header class="top">
+    <strong class="brand"><img class="logo" src="/img/logo-128.png" width="28" height="28" alt="">Convertr</strong>
+    <nav class="tabs" role="tablist">
+      <button id="tab-convert" role="tab" aria-selected="true" data-view="convert">Convert</button>
+      <button id="tab-queue" role="tab" aria-selected="false" data-view="queue">Queue <span id="queue-badge" class="badge" hidden></span></button>
+      <button id="tab-setup" role="tab" aria-selected="false" data-view="setup">Setup</button>
+    </nav>
+    <span class="spacer"></span>
+    <label class="inline">Theme
+      <select id="theme-select"><option value="System">System</option><option value="Light">Light</option><option value="Dark">Dark</option></select>
+    </label>
+    <button id="logout" type="button">Sign out</button>
+  </header>
+
+  <section id="view-convert" class="view">
+    <div class="panel">
+      <label for="media-folder">Media folder</label>
+      <div class="row">
+        <input id="media-folder" type="text" spellcheck="false" placeholder="Choose a folder with Browse" autocomplete="off">
+        <button id="browse" type="button">Browse...</button>
+        <button id="scan" type="button" class="primary">Scan</button>
+        <button id="cancel-scan" type="button" hidden>Cancel</button>
+      </div>
+      <p id="folder-error" class="error" role="alert"></p>
+      <div id="progress-box" hidden>
+        <progress id="progress" max="100" value="0"></progress>
+        <span id="progress-text" class="muted small"></span>
+      </div>
+      <p id="scan-note" class="muted small"></p>
+    </div>
+
+    <div id="results" hidden>
+      <div id="summary" class="cards"></div>
+      <p id="estimate-note" class="muted small"></p>
+      <div class="toolbar">
+        <div id="filters" class="chips" role="group" aria-label="Filter">
+          <button data-filter="all" aria-pressed="true">All</button>
+          <button data-filter="convert" aria-pressed="false">To convert</button>
+          <button data-filter="skip" aria-pressed="false">Skip</button>
+          <button data-filter="attention" aria-pressed="false">Needs attention</button>
+        </div>
+        <input id="search" type="search" placeholder="Search path..." autocomplete="off">
+        <span class="spacer"></span>
+        <button id="select-convert" type="button">Select all to convert</button>
+        <button id="select-none" type="button">Select none</button>
+        <button id="export" type="button">Export CSV</button>
+      </div>
+      <div class="grid" role="table" aria-label="Scan results">
+        <div class="grid-head" role="row" id="grid-head"></div>
+        <div class="grid-body" id="grid-body" role="rowgroup" tabindex="0"><div id="grid-space"></div></div>
+      </div>
+      <div class="footer">
+        <span id="selection-text">Nothing selected.</span>
+        <span class="spacer"></span>
+        <button id="convert-selected" type="button" class="primary" disabled>Convert selected...</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-queue" class="view" hidden>
+    <div class="panel">
+      <div class="row">
+        <strong id="queue-title">No conversion yet</strong>
+        <span class="spacer"></span>
+        <button id="q-pause" type="button" hidden>Pause</button>
+        <button id="q-resume" type="button" hidden>Resume</button>
+        <button id="q-stop-after" type="button" hidden>Stop after this file</button>
+        <button id="q-stop" type="button" hidden class="danger">Stop now</button>
+        <button id="q-resume-queue" type="button" hidden class="primary">Resume queue</button>
+        <button id="q-discard" type="button" hidden>Discard queue</button>
+      </div>
+      <progress id="q-progress" max="100" value="0" hidden></progress>
+      <p id="q-text" class="muted small" role="status"></p>
+      <p id="q-error" class="error" role="alert"></p>
+    </div>
+    <div class="panel tablewrap">
+      <table class="tbl" id="q-table" aria-label="Conversion queue">
+        <thead><tr><th>File</th><th>State</th><th class="num">Size</th><th class="num">Result</th><th>Progress / note</th><th></th></tr></thead>
+        <tbody id="q-body"></tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <details id="q-log-box">
+        <summary><strong>Log</strong> <span class="muted small">(this run, including the ffmpeg commands of a dry run)</span></summary>
+        <p class="muted small">File on the server: <code id="q-log-file">none yet</code></p>
+        <pre id="q-log" class="log" tabindex="0" aria-live="off"></pre>
+      </details>
+    </div>
+    <div class="panel">
+      <div class="row"><h2>Undo</h2><span class="spacer"></span><button id="undo-selected" type="button" disabled>Undo selected</button></div>
+      <p class="muted small">Converted files can be put back: the converted file is kept in <code>_Convertr_Undone</code>, the original returns with its old date. Possible while the original is still in <code>_Convertr_Originals</code>.</p>
+      <table class="tbl" aria-label="Undo list">
+        <thead><tr><th></th><th>File</th><th class="num">Original</th><th class="num">Converted</th><th>Status</th></tr></thead>
+        <tbody id="undo-body"></tbody>
+      </table>
+      <p id="undo-msg" class="muted small" role="status"></p>
+    </div>
+  </section>
+
+  <section id="view-setup" class="view" hidden>
+    <form id="setup-settings" class="panel narrow">
+      <h2>Rules and appearance</h2>
+      <div class="fields" id="settings-fields"></div>
+      <p id="settings-msg" class="muted small" role="status"></p>
+      <button type="submit" class="primary">Save</button>
+    </form>
+    <form id="setup-encoder" class="panel narrow">
+      <h2>Encoder and scratch disk</h2>
+      <div class="fields" id="encoder-fields"></div>
+      <p class="muted small">Encoder choices (measured on the Arc Pro B60): <b>Intel VAAPI HEVC, quality 23</b> is the default: about 13x faster than real time and files about 30 % of the source size. <b>QSV quality 21</b> gives the same picture quality and size, slightly slower. <b>CPU x265</b> makes files about 20 % smaller at the same quality but runs at about 0.6x real time (roughly 3 hours per movie). Lower quality numbers mean better pictures and bigger files; 20 is too big, 29 is visibly worse. AV1 has not been tested.</p>
+      <p class="muted small">Scratch: each file is copied to this local disk, converted there, and only a smaller verified result is copied back. The folder must be empty (it is marked on first use) and outside the media folders.</p>
+      <p id="encoder-msg" class="muted small" role="status"></p>
+      <button type="submit" class="primary">Save</button>
+    </form>
+    <div class="panel narrow">
+      <h2>Hardware</h2>
+      <dl id="hw-info" class="info"></dl>
+      <div class="row"><button id="hw-detect" type="button">Detect hardware / test Intel GPU</button><span id="hw-msg" class="muted small" role="status"></span></div>
+      <details><summary class="muted small">Test log</summary><pre id="hw-log" class="log"></pre></details>
+    </div>
+    <div class="panel narrow" id="nas-panel">
+      <h2>Network storage (NAS)</h2>
+      <p class="muted small">Connect the media share of a NAS (NFS, for example a Synology) to this server. The service never mounts anything and never gets root rights: this page checks your input, lists what the NAS offers, writes the exact commands for you to run once with <code>sudo</code> on this server, and then checks the result from the inside.</p>
+      <p id="nas-hint" class="warnbox" hidden></p>
+      <div class="fields nas-fields">
+        <!-- 172.16.0.20 below is a placeholder example, not a real address; users enter their own NAS. -->
+        <label><span>NAS host name or IPv4 address</span><input id="nas-host" type="text" spellcheck="false" autocomplete="off" placeholder="172.16.0.20"></label>
+        <label><span>Shared folder on the NAS</span><input id="nas-share" type="text" spellcheck="false" autocomplete="off" placeholder="/volume1/library"></label>
+        <label><span>Mount point on this server</span><input id="nas-mp" type="text" spellcheck="false" autocomplete="off" placeholder="/mnt/nas-media"></label>
+        <label><span>NFS version</span><select id="nas-vers"><option value="3">3 (works everywhere)</option><option value="4.1">4.1</option></select></label>
+        <label><span>Media folder on the share (for the check)</span><input id="nas-media" type="text" spellcheck="false" autocomplete="off" placeholder="/mnt/nas-media/Movies"></label>
+        <label class="chk"><input id="nas-ro" type="checkbox"><span>Mount read-only (a safe first test)</span></label>
+      </div>
+      <div class="row wrap"><button id="nas-list" type="button">List shares on the NAS</button><button id="nas-gen" type="button" class="primary">Show the commands</button><span id="nas-msg" class="muted small" role="status"></span></div>
+      <p id="nas-error" class="error" role="alert"></p>
+      <div id="nas-exports" hidden>
+        <h3>Shares the NAS offers</h3>
+        <table class="tbl" aria-label="NFS shares"><thead><tr><th>Share</th><th>Allowed clients</th><th>This server</th><th></th></tr></thead><tbody id="nas-exports-body"></tbody></table>
+      </div>
+      <div id="nas-cmds" hidden>
+        <h3>1. On the NAS (DSM), once</h3>
+        <ol class="notes">
+          <li>Control Panel, File Services, NFS tab: tick <b>Enable NFS service</b>, Apply.</li>
+          <li>Control Panel, Shared Folder, select the folder, Edit, <b>NFS Permissions</b>, Create: address <code id="nas-server-ip">this server's address</code>, Privilege <b>Read/Write</b>, Squash <b>Map all users to admin</b>, tick "Allow connections from non-privileged ports" and "Allow users to access mounted subfolders". Keep any existing rules for other machines.</li>
+        </ol>
+        <h3>2. On this server, once (needs sudo)</h3>
+        <p class="muted small">The line that goes into <code>/etc/fstab</code>:</p>
+        <div class="cmd"><pre id="nas-fstab" tabindex="0"></pre><button type="button" class="copy" data-copy-from="nas-fstab">Copy</button></div>
+        <ol id="nas-steps" class="cmdlist"></ol>
+        <div class="row wrap"><button id="nas-copy-all" type="button">Copy all commands</button><span id="nas-copy-msg" class="muted small" role="status"></span></div>
+        <pre id="nas-script" hidden></pre>
+        <h3>3. Allowed folders</h3>
+        <p id="nas-roots-msg" class="muted small"></p>
+        <ul id="nas-roots-cmds" class="cmdlist"></ul>
+      </div>
+      <h3>Check the mount</h3>
+      <p class="muted small">Looks from inside the service: is the mount point really a mounted NFS share, how much space is free, can the service write and rename, can the <code>_Convertr_Originals</code> folder be created next to the media folder. It only creates tiny hidden test files and removes them again.</p>
+      <div class="row wrap"><button id="nas-check" type="button" class="primary">Check mount</button><span id="nas-check-msg" class="muted small" role="status"></span></div>
+      <p id="nas-summary" class="summary" hidden></p>
+      <ul id="nas-results" class="results"></ul>
+    </div>
+    <div class="panel narrow">
+      <h2>This server</h2>
+      <dl id="server-info" class="info"></dl>
+      <p class="muted small">ffmpeg folder and install options arrive in a later milestone (S4/S5).</p>
+    </div>
+    <form id="password-form" class="panel narrow" autocomplete="off">
+      <h2>Change password</h2>
+      <label>Current password <input id="pw-current" type="password" autocomplete="current-password" required></label>
+      <label>New password <input id="pw-new" type="password" autocomplete="new-password" minlength="10" required></label>
+      <p id="pw-msg" class="muted small" role="status"></p>
+      <button type="submit">Change password</button>
+    </form>
+  </section>
+</div>
+
+<dialog id="confirm-dialog">
+  <form method="dialog" class="dlg">
+    <h2>Convert selected files?</h2>
+    <dl id="confirm-info" class="info"></dl>
+    <ul id="confirm-warn" class="notes"></ul>
+    <ul id="confirm-block" class="notes bad"></ul>
+    <p class="muted small">Originals are never deleted: after a verified, smaller result the original moves to <code>_Convertr_Originals</code> and can be undone. If the result is not smaller, the original stays untouched.</p>
+    <label class="chk"><input id="confirm-dry" type="checkbox"> Dry run (only list the ffmpeg commands in the log; nothing is changed)</label>
+    <div class="row end">
+      <button value="cancel" type="submit">Cancel</button>
+      <button id="confirm-go" type="button" class="primary">Start converting</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="browse-dialog">
+  <form method="dialog" class="dlg">
+    <h2>Choose a folder</h2>
+    <div class="row"><button id="browse-up" type="button">Up</button><code id="browse-path"></code></div>
+    <p id="browse-error" class="error" role="alert"></p>
+    <ul id="browse-list" class="list" tabindex="0"></ul>
+    <p class="muted small" id="browse-free"></p>
+    <div class="row end">
+      <button value="cancel" type="submit">Cancel</button>
+      <button id="browse-ok" type="button" class="primary" disabled>Use this folder</button>
+    </div>
+  </form>
+</dialog>
+</body>
+</html>

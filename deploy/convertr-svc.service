@@ -1,0 +1,52 @@
+# Convertr_svc systemd unit. Installed by scripts/install.sh to /etc/systemd/system/convertr-svc.service
+# Copyright (C) 2026 JeepNWilly. Free software under the GNU GPL v3 or later; no warranty.
+[Unit]
+Description=Convertr_svc media converter (web interface)
+Documentation=file:///opt/convertr-svc/docs/DESIGN.md
+After=network-online.target remote-fs.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=convertr
+Group=convertr
+# /dev/dri/renderD128 belongs to group "render" on Ubuntu; "video" for older setups
+SupplementaryGroups=render video
+ExecStart=/opt/convertr-svc/convertr-svc
+Environment=CONVERTR_CONFIG_DIR=/etc/convertr-svc
+Environment=CONVERTR_DATA_DIR=/var/lib/convertr-svc
+Environment=DOTNET_gcServer=0
+Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
+StateDirectory=convertr-svc
+StateDirectoryMode=0750
+ConfigurationDirectory=convertr-svc
+SyslogIdentifier=convertr-svc
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=60
+KillMode=control-group
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+
+# hardening (relaxed only where the GPU and the media paths require it)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+PrivateDevices=false
+# DeviceAllow needs a device node path or a device class from /proc/devices ("char-drm" = all /dev/dri nodes: card0, renderD128).
+# A directory such as /dev/dri is NOT accepted. DevicePolicy=closed still allows /dev/null, zero, full, random, urandom, tty and
+# the pty devices, so ffmpeg and .NET keep working; only the listed device classes are added.
+DevicePolicy=closed
+DeviceAllow=char-drm rw
+# The data dir is writable via StateDirectory. Media roots and the scratch folder (milestones S3 and later, writes)
+# are added by the drop-in /etc/systemd/system/convertr-svc.service.d/paths.conf that install.sh creates.
+ReadWritePaths=-/srv/convertr-scratch
+
+[Install]
+WantedBy=multi-user.target

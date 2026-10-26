@@ -1,0 +1,45 @@
+<!--
+  Copyright (C) 2026 JeepNWilly
+Convertr_svc is free software: you can redistribute it and/or modify it under the terms of the
+GNU General Public License as published by the Free Software Foundation, either version 3
+of the License, or (at your option) any later version. It comes with no warranty.
+See the LICENSE file in the repository root or <https://www.gnu.org/licenses/>.
+-->
+<Project InitialTargets="CheckConvertrCore">
+  <PropertyGroup>
+    <ConvertrVersion>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)VERSION').Trim())</ConvertrVersion>
+    <ConvertrBuild>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)BUILD_NUMBER').Trim())</ConvertrBuild>
+    <Version>$(ConvertrVersion)</Version>
+    <AssemblyVersion>$(ConvertrVersion).$(ConvertrBuild)</AssemblyVersion>
+    <FileVersion>$(ConvertrVersion).$(ConvertrBuild)</FileVersion>
+    <InformationalVersion>$(ConvertrVersion) (build $(ConvertrBuild))</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <Authors>JeepNWilly</Authors>
+    <Company>JeepNWilly</Company>
+    <Copyright>Copyright (C) 2026 JeepNWilly</Copyright>
+    <Product>Convertr_svc</Product>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!-- The shared engine. One copy only: the sibling Convertr repository (DESIGN.md section 2.2).
+       Lookup order: CONVERTR_CORE_DIR, then the git submodule external/Convertr (clone with submodules),
+       then a sibling checkout ../Convertr/source (Windows layout) or ../Convertr (plain clone of the Convertr repo). -->
+  <PropertyGroup>
+    <ConvertrCoreDir Condition="'$(CONVERTR_CORE_DIR)' != ''">$([MSBuild]::EnsureTrailingSlash('$(CONVERTR_CORE_DIR)'))</ConvertrCoreDir>
+    <ConvertrCoreDir Condition="'$(ConvertrCoreDir)' == '' and Exists('$(MSBuildThisFileDirectory)external/Convertr/src/Convertr.Core/Convertr.Core.csproj')">$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', 'external', 'Convertr', 'src', 'Convertr.Core'))</ConvertrCoreDir>
+    <ConvertrCoreDir Condition="'$(ConvertrCoreDir)' == '' and Exists('$(MSBuildThisFileDirectory)../Convertr/source/src/Convertr.Core/Convertr.Core.csproj')">$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', '..', 'Convertr', 'source', 'src', 'Convertr.Core'))</ConvertrCoreDir>
+    <ConvertrCoreDir Condition="'$(ConvertrCoreDir)' == '' and Exists('$(MSBuildThisFileDirectory)../Convertr/src/Convertr.Core/Convertr.Core.csproj')">$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', '..', 'Convertr', 'src', 'Convertr.Core'))</ConvertrCoreDir>
+    <ConvertrCoreDir Condition="'$(ConvertrCoreDir)' == ''">$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', 'external', 'Convertr', 'src', 'Convertr.Core'))</ConvertrCoreDir>
+    <ConvertrCoreProject>$(ConvertrCoreDir)Convertr.Core.csproj</ConvertrCoreProject>
+    <ConvertrSharedTestsProject>$([MSBuild]::NormalizeDirectory('$(ConvertrCoreDir)', '..', '..', 'tests', 'Convertr.Tests'))Convertr.Tests.csproj</ConvertrSharedTestsProject>
+  </PropertyGroup>
+
+  <!-- Fail loudly (never a silent fallback) when the shared engine is not where we expect it. -->
+  <Target Name="CheckConvertrCore">
+    <Error Condition="!Exists('$(ConvertrCoreProject)')"
+           Text="Convertr_svc needs the shared engine Convertr.Core but could not find '$(ConvertrCoreProject)'. Run 'git submodule update --init' (or check out the Convertr repository next to this one) or set the environment variable CONVERTR_CORE_DIR to the folder that contains Convertr.Core.csproj (for example ~/src/Convertr/src/Convertr.Core)." />
+  </Target>
+</Project>

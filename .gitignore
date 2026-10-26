@@ -1,0 +1,26 @@
+# build output
+bin/
+obj/
+publish/
+dist/
+TestResults/
+*.user
+.vs/
+.vscode/
+*.log
+
+# secrets and local data
+appsettings.json
+!deploy/appsettings.example.json
+*.token
+*.key
+*.pem
+.env
+*.bak-*
+*.tar.gz
+*.sha256
+*.dmp
+*.exe
+
+# local publishing notes (never commit)
+PUBLISHING.local.md

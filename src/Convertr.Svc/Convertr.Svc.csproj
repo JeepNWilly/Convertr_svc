@@ -1,0 +1,28 @@
+<!--
+  Copyright (C) 2026 JeepNWilly
+  Convertr_svc is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3
+  of the License, or (at your option) any later version. It comes with no warranty.
+  See the LICENSE file in the repository root or <https://www.gnu.org/licenses/>.
+-->
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Convertr.Svc</RootNamespace>
+    <AssemblyName>convertr-svc</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="10.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(ConvertrCoreProject)" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- the web UI is embedded in the binary (single file); served by StaticUi. CONVERTR_WWWROOT serves from disk instead (development). -->
+    <Content Remove="wwwroot\**" />
+    <EmbeddedResource Include="wwwroot\**" LogicalName="wwwroot/%(RecursiveDir)%(Filename)%(Extension)" />
+    <InternalsVisibleTo Include="Convertr.Svc.Tests" />
+  </ItemGroup>
+</Project>
